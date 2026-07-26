@@ -1,41 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { nanoid } from "nanoid";
-import { requireUser } from "@/lib/require-auth";
+import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+// Inasoma API Keys kutoka kwenye .env.local (au Vercel Env)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-/**
- * Dev/local storage: writes to /public/uploads and returns a relative URL.
- * For production, swap this for an S3-compatible upload (presigned URL or
- * server-side PutObject) — the API contract ({ url }) stays the same, so
- * nothing else in the app needs to change.
- */
-export async function POST(req: NextRequest) {
-  const auth = await requireUser();
-  if ("error" in auth) return auth.error;
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  const formData = await req.formData().catch(() => null);
-  const file = formData?.get("file");
-  if (!file || !(file instanceof Blob)) {
-    return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData()
+    const file = (formData.get('file') as File) || (formData.get('image') as File)
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'Hakuna picha iliyochaguliwa' },
+        { status: 400 }
+      )
+    }
+
+    // Kutengeneza jina la kipekee la picha (e.g. 1722000000-xyz.jpg)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+    
+    // Convert File kuwa Buffer kwa ajili ya Upload
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Upload picha kuelekea Supabase Storage Bucket linaloitwa 'covers'
+    const { data, error } = await supabase.storage
+      .from('covers')
+      .upload(fileName, buffer, {
+        contentType: file.type,
+        upsert: true
+      })
+
+    if (error) {
+      console.error('Supabase upload error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Chukua Link ya picha kutoka Supabase (Public URL)
+    const { data: publicUrlData } = supabase.storage
+      .from('covers')
+      .getPublicUrl(fileName)
+
+    // Rudisha URL ya picha kuelekea Frontend
+    return NextResponse.json({ url: publicUrlData.publicUrl })
+
+  } catch (error: any) {
+    console.error('Server error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Kuna tatizo limetokea wakati wa ku-upload' },
+      { status: 500 }
+    )
   }
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: "Only JPEG, PNG, or WEBP images are allowed." }, { status: 400 });
-  }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Image too large. Max 5MB." }, { status: 400 });
-  }
-
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const fileName = `${nanoid(16)}.${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadDir, fileName), buffer);
-
-  return NextResponse.json({ url: `/uploads/${fileName}` });
 }
