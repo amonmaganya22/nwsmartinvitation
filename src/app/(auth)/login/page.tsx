@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/components/ui/Card";
@@ -8,7 +8,7 @@ import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { apiFetch } from "@/lib/api-client";
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
@@ -82,5 +82,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </AuthShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-8 text-sm text-gray-500">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

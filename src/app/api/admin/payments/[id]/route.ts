@@ -1,17 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireRole } from "@/lib/require-auth";
+import { requireUser } from "@/lib/require-auth";
 
-export async function GET() {
-  const auth = await requireUser();
-  if ("error" in auth) return auth.error;
-  const forbidden = requireRole(auth.user, ["ADMIN"]);
-  if (forbidden) return forbidden;
+// GET /api/admin/payments/[id] - Kupata taarifa za malipo maalum
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const auth = await requireUser();
+    if ("error" in auth) return auth.error;
 
-  const payments = await prisma.payment.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { user: { select: { fullName: true, email: true, plan: true } } }
-  });
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+    });
 
-  return NextResponse.json({ payments });
+    if (!payment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(payment);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch payment details" },
+      { status: 500 }
+    );
+  }
 }
