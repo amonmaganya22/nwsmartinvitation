@@ -10,9 +10,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // Map vigezo vyote
+    // Map vigezo vyote kutoka frontend
     const titleName = body.name || body.title || body.eventName;
     const rawDate = body.eventDate || body.date;
+    const eventTime = body.eventTime || body.time || "00:00"; // Fallback kama muda haukutumwa
     const locationName = body.venue || body.location || null;
     const description = body.description || null;
     const coverUrl = body.coverImageUrl || body.coverUrl || body.cover || null;
@@ -33,14 +34,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Save to Prisma using schema's exact property names ('venue', 'eventDate', 'coverImageUrl')
+    // 3. Save to Prisma (ikihusisha na eventTime)
     const newEvent = await prisma.event.create({
       data: {
         name: titleName,
         eventDate: parsedDate,
-        venue: locationName, // <--- 'venue' badala ya 'location'
+        eventTime: eventTime, // <--- HAPA: Prisma schema inahitaji eventTime!
+        venue: locationName,
         description,
-        coverImageUrl: coverUrl, // <--- 'coverImageUrl' badala ya 'coverUrl'
+        coverImageUrl: coverUrl,
         userId: auth.user.id,
       },
     });
