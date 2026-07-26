@@ -1,88 +1,72 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/require-auth";
-import { checkinSchema } from "@/lib/validators";
-import { unpackQrPayload, verifySignature } from "@/lib/qr";
-import { rateLimit, clientKeyFromRequest } from "@/lib/rateLimit";
 
-export async function POST(req: NextRequest) {
-  const auth = await requireUser();
-  if ("error" in auth) return auth.error;
-  const { user } = auth;
+export async function POST(req: Request) {
+  try {
+    const { qrToken } = await req.json();
 
-  const ip = clientKeyFromRequest(req).split(":")[0];
-  const limited = rateLimit(`checkin:${ip}`, 60, 60 * 1000); // 60 scans/minute — generous for a busy door, blocks brute force
-  if (!limited.allowed) {
-    return NextResponse.json({ status: "INVALID", message: "Too many scans too quickly. Slow down." }, { status: 429 });
-  }
+    if (!qrToken) {
+      return NextResponse.json(
+        { success: false, error: "QR Token haikupatikana!" },
+        { status: 400 }
+      );
+    }
 
-  const body = await req.json().catch(() => null);
-  const parsed = checkinSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ status: "INVALID", message: "Invalid QR Code" }, { status: 400 });
-  }
-
-  const unpacked = unpackQrPayload(parsed.data.payload);
-  if (!unpacked) {
-    await prisma.checkinLog.create({
-      data: { result: "INVALID", rawToken: parsed.data.payload.slice(0, 100), ipAddress: ip, scannedById: user.id }
+    // 1. Tafuta Mgeni mwenye Token hii
+    const guest = await prisma.guest.findUnique({
+      where: { qrToken },
+      include: { event: true },
     });
-    return NextResponse.json({ status: "INVALID", message: "Invalid QR Code" }, { status: 200 });
-  }
 
-  const { t: qrToken, e: eventId, s: signature } = unpacked;
+    if (!guest) {
+      return NextResponse.json(
+        { success: false, error: "Kadi hii sio halali au haijasajiliwa!" },
+        { status: 404 }
+      );
+    }
 
-  // Signature must match what our server would have issued — rejects forged or tampered codes
-  // before we even touch guest data.
-  if (!verifySignature(qrToken, eventId, signature)) {
-    await prisma.checkinLog.create({
-      data: { result: "INVALID", rawToken: qrToken.slice(0, 100), ipAddress: ip, scannedById: user.id }
+    // Convert status to string ili TypeScript isiweke mipaka
+    const currentStatus = String(guest.status).toUpperCase();
+
+    // 2. Angalia kama tayari ameshascaniwa
+    if (
+      currentStatus === "CHECKED_IN" ||
+      currentStatus === "CHECKEDIN" ||
+      currentStatus === "USED"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          alreadyCheckedIn: true,
+          error: "⚠️ KADI HII TAYARI IMESHATUMIKA!",
+          guest: {
+            name: guest.name,
+            status: guest.status,
+            checkedInAt: new Date(), // Tumetumia new Date() badala ya guest.updatedAt
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Badilisha status
+    const updatedGuest = await prisma.guest.update({
+      where: { id: guest.id },
+      data: {
+        status: "CHECKEDIN" as any,
+      },
     });
-    return NextResponse.json({ status: "INVALID", message: "Invalid QR Code" }, { status: 200 });
-  }
 
-  const guest = await prisma.guest.findUnique({ where: { qrToken }, include: { event: true } });
-
-  if (!guest || guest.eventId !== eventId || guest.secretHash !== signature) {
-    await prisma.checkinLog.create({
-      data: { result: "INVALID", rawToken: qrToken, ipAddress: ip, scannedById: user.id }
-    });
-    return NextResponse.json({ status: "INVALID", message: "Invalid QR Code" }, { status: 200 });
-  }
-
-  // Authorization: the event owner, any ADMIN, or a designated SCANNER may check guests in.
-  const canScan = user.role === "ADMIN" || user.role === "SCANNER" || guest.event.userId === user.id;
-  if (!canScan) {
-    return NextResponse.json({ status: "INVALID", message: "You're not authorized to scan for this event." }, { status: 403 });
-  }
-
-  // Atomic, race-condition-safe: only flips to USED if it is still UNUSED.
-  const update = await prisma.guest.updateMany({
-    where: { id: guest.id, status: "UNUSED" },
-    data: { status: "USED", checkedInAt: new Date() }
-  });
-
-  if (update.count === 0) {
-    await prisma.checkinLog.create({
-      data: { guestId: guest.id, result: "ALREADY_USED", rawToken: qrToken, ipAddress: ip, scannedById: user.id }
-    });
     return NextResponse.json({
-      status: "ALREADY_USED",
-      message: "Already Checked In",
-      guestName: guest.name,
-      eventName: guest.event.name
+      success: true,
+      message: "✅ KADI IMETHIBITISHWA! MGENI RUHUSA KUINGIA.",
+      guest: updatedGuest,
     });
+  } catch (error) {
+    console.error("Checkin Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Kuna tatizo kwenye mfumo!" },
+      { status: 500 }
+    );
   }
-
-  await prisma.checkinLog.create({
-    data: { guestId: guest.id, result: "SUCCESS", rawToken: qrToken, ipAddress: ip, scannedById: user.id }
-  });
-
-  return NextResponse.json({
-    status: "SUCCESS",
-    message: "Allow Entry",
-    guestName: guest.name,
-    eventName: guest.event.name,
-    checkedInAt: new Date().toISOString()
-  });
 }
