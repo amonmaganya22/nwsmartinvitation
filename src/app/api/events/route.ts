@@ -1,31 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-auth";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // 1. Hakikisha mtumiaji ameingia kwenye mfumo (Authenticated)
+    const auth = await requireUser();
+    if ("error" in auth) return auth.error;
+
     const body = await req.json();
 
-    // Inachukua 'title' au 'name' au 'eventName'
-    const title = body.title || body.name || body.eventName;
-    
-    // Inachukua 'date' au 'eventDate'
+    // Map vigezo vyote vinavyoweza kutumwa kutoka Frontend
+    const titleName = body.title || body.name || body.eventName;
     const rawDate = body.date || body.eventDate;
-
-    // Inachukua 'location' au 'venue'
     const location = body.location || body.venue || null;
-
-    // Description na Cover Image (za hiari / optional)
     const description = body.description || null;
     const coverUrl = body.coverUrl || body.cover || body.coverImageUrl || null;
 
-    // 1. Validation ya vifaa vya lazima
-    if (!title || !rawDate) {
+    // 2. Validation ya vifaa vya lazima
+    if (!titleName || !rawDate) {
       return NextResponse.json(
         { error: "Title na Date vinahitajika!" },
         { status: 400 }
       );
     }
 
-    // 2. Hakikisha Date ipo kwenye mfumo sahihi
+    // 3. Hakikisha Date ipo kwenye mfumo sahihi
     const parsedDate = new Date(rawDate);
     if (isNaN(parsedDate.getTime())) {
       return NextResponse.json(
@@ -34,33 +34,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Hapa utakapokuwa tayari ku-save kwenye Prisma/Database:
-    /*
+    // 4. Hifadhi Event halisi kwenye Database kupitia Prisma
+    // Ukaguzi wa field ya name/title kwenye Prisma Schema yako
     const newEvent = await prisma.event.create({
       data: {
-        title,
+        name: titleName, // Kama schema yako inatumia 'title', badilisha hapa kuwa `title: titleName`
         description,
         date: parsedDate,
         location,
         coverUrl,
+        userId: auth.user.id, // Inaunganisha event na mtumiaji aliyetengeneza
       },
     });
-    */
-
-    // Tunaweka mock ID ili frontend redirects zifanye kazi bila crash
-    const createdEvent = {
-      id: "demo-event-" + Date.now(),
-      title,
-      description,
-      date: parsedDate,
-      location,
-      coverUrl
-    };
 
     return NextResponse.json(
       { 
         message: "Event imeundwa kikamilifu!", 
-        event: createdEvent 
+        event: newEvent 
       },
       { status: 201 }
     );

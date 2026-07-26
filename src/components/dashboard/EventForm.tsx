@@ -47,7 +47,8 @@ export function EventForm({ initial }: { initial?: EventFormValues }) {
 
   useEffect(() => {
     apiFetch("/api/templates")
-      .then((data) => setTemplates(data.templates))
+      .then((data) => setTemplates(data.templates || []))
+      .catch(() => setTemplates([]))
       .finally(() => setTemplatesLoading(false));
   }, []);
 
@@ -59,12 +60,16 @@ export function EventForm({ initial }: { initial?: EventFormValues }) {
     setError(null);
     setLoading(true);
     try {
-      // Tunatuma vigezo vyote viwili (vya frontend na backend) ili kuhakikisha havigongi mwamba
+      // Tengeneza Full ISO Date-Time kama zote zimejazwa
+      const fullDate = values.eventDate && values.eventTime 
+        ? `${values.eventDate}T${values.eventTime}`
+        : values.eventDate;
+
       const payload = {
         title: values.name,
         name: values.name,
-        date: values.eventDate,
-        eventDate: values.eventDate,
+        date: fullDate,
+        eventDate: fullDate,
         eventTime: values.eventTime,
         time: values.eventTime,
         venue: values.venue,
@@ -77,18 +82,17 @@ export function EventForm({ initial }: { initial?: EventFormValues }) {
 
       if (isEdit) {
         await apiFetch(`/api/events/${initial!.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        router.refresh();
         router.push(`/dashboard/events/${initial!.id}`);
       } else {
         const data = await apiFetch("/api/events", { method: "POST", body: JSON.stringify(payload) });
-        
-        // Kama backend ikirudisha event na id
+        router.refresh();
         if (data?.event?.id) {
           router.push(`/dashboard/events/${data.event.id}`);
         } else {
           router.push("/dashboard/events");
         }
       }
-      router.refresh();
     } catch (err: any) {
       setError(err.message || "Hitilafu imetokea wakati wa kuunda event");
     } finally {
@@ -143,7 +147,7 @@ export function EventForm({ initial }: { initial?: EventFormValues }) {
         <EventCard
           layout={previewLayout}
           eventName={values.name || "Your Event Name"}
-          eventDate={values.eventDate || new Date()}
+          eventDate={values.eventDate ? new Date(values.eventDate) : new Date()}
           eventTime={values.eventTime || "18:00"}
           venue={values.venue || "Venue name"}
           description={values.description}
