@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-auth";
 
-// GET /api/events/[id] - Kuleta taarifa za event
+// GET /api/events/[id] - Kuleta taarifa za event na wageni wake
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -53,22 +53,24 @@ export async function PUT(
     const locationName = body.venue || body.location;
     const coverUrl = body.coverImageUrl || body.coverUrl || body.cover;
     const description = body.description;
+    const eventTime = body.eventTime || body.time;
 
-    // Tengeneza update payload kiustadi
+    // Tengeneza update payload kiustadi kwa kuzingatia majina halisi ya Prisma Schema
     const updateData: Record<string, any> = {};
 
     if (eventName) updateData.name = eventName;
     if (rawDate) {
       const parsedDate = new Date(rawDate);
       if (!isNaN(parsedDate.getTime())) {
-        updateData.date = parsedDate;
+        updateData.eventDate = parsedDate; // <--- Schema inatumia 'eventDate'
       }
     }
-    if (locationName !== undefined) updateData.location = locationName;
+    if (eventTime) updateData.eventTime = eventTime;
+    if (locationName !== undefined) updateData.venue = locationName; // <--- Schema inatumia 'venue'
     if (description !== undefined) updateData.description = description;
     
-    // Inahifadhi ama URL ya picha au null (kama mtumiaji amefuta picha)
-    if (coverUrl !== undefined) updateData.coverUrl = coverUrl || null;
+    // Inahifadhi ama URL ya picha au null
+    if (coverUrl !== undefined) updateData.coverImageUrl = coverUrl || null; // <--- Schema inatumia 'coverImageUrl'
 
     const updatedEvent = await prisma.event.updateMany({
       where: {

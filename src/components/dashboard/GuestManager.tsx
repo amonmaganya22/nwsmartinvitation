@@ -1,131 +1,231 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { UserPlus, Upload, Trash2, CheckCircle2, Clock, ExternalLink } from "lucide-react";
-import { Input, Label, FieldError } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-import { apiFetch, getCsrfToken } from "@/lib/api-client";
-import { useCsrfBootstrap } from "@/lib/use-csrf-bootstrap";
+import { useState } from "react";
+import { Plus, Upload, Users, Phone, Mail, Trash2 } from "lucide-react";
 
-type Guest = {
+interface Guest {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
   email: string | null;
-  status: "UNUSED" | "USED";
-  qrToken: string;
-};
+  status: string;
+  qrToken?: string | null;
+}
 
-export function GuestManager({ eventId, initialGuests }: { eventId: string; initialGuests: Guest[] }) {
-  useCsrfBootstrap();
+interface GuestManagerProps {
+  eventId: string;
+  initialGuests: Guest[];
+}
+
+export function GuestManager({ eventId, initialGuests }: GuestManagerProps) {
   const [guests, setGuests] = useState<Guest[]>(initialGuests);
-  const [form, setForm] = useState({ name: "", phone: "", email: "" });
-  const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importSummary, setImportSummary] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  async function addGuest(e: React.FormEvent) {
+  // Kuongeza Mgeni
+  const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setAdding(true);
-    try {
-      const data = await apiFetch(`/api/events/${eventId}/guests`, { method: "POST", body: JSON.stringify(form) });
-      setGuests([data.guest, ...guests]);
-      setForm({ name: "", phone: "", email: "" });
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setAdding(false);
-    }
-  }
+    if (!name.trim()) return;
 
-  async function deleteGuest(id: string) {
-    await apiFetch(`/api/guests/${id}`, { method: "DELETE" });
-    setGuests(guests.filter((g) => g.id !== id));
-  }
-
-  async function importCsv(file: File) {
-    setImporting(true);
-    setImportSummary(null);
+    setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const csrf = getCsrfToken();
-      const res = await fetch(`/api/events/${eventId}/guests/import`, {
+      const res = await fetch(`/api/events/${eventId}/guests`, {
         method: "POST",
-        body: formData,
-        credentials: "include",
-        headers: csrf ? { "x-csrf-token": csrf } : undefined
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone, email }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Import failed.");
-      setImportSummary(
-        `Imported ${data.imported} guest(s).${data.skippedExisting ? ` Skipped ${data.skippedExisting} duplicate phone number(s).` : ""}${data.rowErrors?.length ? ` ${data.rowErrors.length} row(s) had errors.` : ""}`
-      );
-      // Refresh guest list
-      const refreshed = await apiFetch(`/api/events/${eventId}/guests`);
-      setGuests(refreshed.guests);
-    } catch (err: any) {
-      setImportSummary(err.message);
+
+      if (res.ok) {
+        setGuests((prev) => [data.guest, ...prev]);
+        setName("");
+        setPhone("");
+        setEmail("");
+      } else {
+        alert(data.error || "Kuna tatizo limetokea!");
+      }
+    } catch (error) {
+      console.error("Error adding guest:", error);
+      alert("Haikuweza kuongeza mgeni.");
     } finally {
-      setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="card-surface p-6">
-        <h3 className="font-semibold text-brand-dark dark:text-white">Add a guest</h3>
-        <form onSubmit={addGuest} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input required placeholder="Phone number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input placeholder="Email (optional)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <div className="sm:col-span-3 flex items-center gap-3">
-            <Button type="submit" loading={adding}><UserPlus size={16} /> Add guest</Button>
-            <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} loading={importing}>
-              <Upload size={16} /> Import CSV
-            </Button>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])} />
-          </div>
-        </form>
-        <FieldError>{error ?? undefined}</FieldError>
-        {importSummary && <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{importSummary}</p>}
-        <p className="mt-2 text-xs text-gray-400">CSV columns: name, phone, email (optional). First row must be headers.</p>
+      {/* SECTION TITLE & ACTIONS */}
+      <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-600" />
+            Usimamizi wa Wageni ({guests.length})
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Ongeza mgeni mmoja mmoja au ingiza kwa wingi kupitia CSV.
+          </p>
+        </div>
+
+        <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition">
+          <Upload className="w-4 h-4" />
+          Import CSV
+        </button>
       </div>
 
-      <div className="card-surface p-0">
-        <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-          <h3 className="font-semibold text-brand-dark dark:text-white">Guest list ({guests.length})</h3>
+      {/* GRID LAYOUT: Stacked kwenye Mobile, Columns 3 kwenye Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* FORM: Kuongeza Mgeni */}
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm h-fit">
+          <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">
+            Ongeza Mgeni Mpya
+          </h3>
+
+          <form onSubmit={handleAddGuest} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                Jina Kamili *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Mf. Grace Imani"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                Namba ya Simu
+              </label>
+              <input
+                type="tel"
+                placeholder="0712345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="mgeni@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-800 dark:text-white"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl text-sm transition shadow-sm disabled:opacity-50 mt-2"
+            >
+              <Plus className="w-4 h-4" />
+              {loading ? "Inahifadhi..." : "Hifadhi Mgeni"}
+            </button>
+          </form>
         </div>
-        {guests.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No guests yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {guests.map((g) => (
-              <li key={g.id} className="flex items-center justify-between px-6 py-3">
-                <div>
-                  <p className="text-sm font-medium text-brand-dark dark:text-white">{g.name}</p>
-                  <p className="text-xs text-gray-400">{g.phone}{g.email ? ` · ${g.email}` : ""}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`flex items-center gap-1 text-xs font-medium ${g.status === "USED" ? "text-brand-green" : "text-amber-500"}`}>
-                    {g.status === "USED" ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-                    {g.status === "USED" ? "Checked in" : "Pending"}
-                  </span>
-                  <a href={`/invite/${g.qrToken}`} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-green" title="View invitation">
-                    <ExternalLink size={16} />
-                  </a>
-                  <button onClick={() => deleteGuest(g.id)} className="text-gray-400 hover:text-red-600" title="Remove guest">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+
+        {/* LIST: Orodha ya Wageni */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+          <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">
+            Orodha ya Wageni
+          </h3>
+
+          {guests.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">
+              Bado hakuna mgeni aliyeongezwa.
+            </p>
+          ) : (
+            <>
+              {/* DESKTOP TABLE VIEW (Inajificha kwenye simu) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase">
+                    <tr>
+                      <th className="px-4 py-3 rounded-l-xl">Jina</th>
+                      <th className="px-4 py-3">Simu</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 rounded-r-xl text-right">Kitendo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                    {guests.map((guest) => (
+                      <tr key={guest.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition">
+                        <td className="px-4 py-3.5 font-semibold text-gray-800 dark:text-white">
+                          {guest.name}
+                        </td>
+                        <td className="px-4 py-3.5">{guest.phone || "-"}</td>
+                        <td className="px-4 py-3.5">{guest.email || "-"}</td>
+                        <td className="px-4 py-3.5">
+                          <span className="px-2.5 py-1 text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-full">
+                            {guest.status || "INVITED"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <button className="text-red-500 hover:text-red-700 p-1 rounded-lg transition">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE CARDS VIEW (Inaonekana kwenye Simu tu) */}
+              <div className="block sm:hidden space-y-3">
+                {guests.map((guest) => (
+                  <div
+                    key={guest.id}
+                    className="p-4 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between items-start gap-3"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-800 dark:text-white text-sm">
+                          {guest.name}
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 rounded-md">
+                          {guest.status || "INVITED"}
+                        </span>
+                      </div>
+
+                      {guest.phone && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-gray-400" />
+                          {guest.phone}
+                        </p>
+                      )}
+
+                      {guest.email && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-gray-400" />
+                          {guest.email}
+                        </p>
+                      )}
+                    </div>
+
+                    <button className="text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
       </div>
     </div>
   );

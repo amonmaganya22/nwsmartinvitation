@@ -1,57 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/require-auth";
 import crypto from "crypto";
 
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> } // <-- params sasa ni Promise!
 ) {
   try {
-    const { id } = await params;
-    const auth = await requireUser();
-    if ("error" in auth) return auth.error;
+    // 1. Fanya await kwenye params kwanza ili kupata id
+    const { id: eventId } = await context.params;
 
-    const body = await req.json();
+    const body = await request.json();
     const { guests } = body;
 
-    if (!Array.isArray(guests) || guests.length === 0) {
+    if (!guests || !Array.isArray(guests)) {
       return NextResponse.json(
-        { error: "Invalid or empty guest list provided" },
+        { error: "Orodha ya wageni haijapatikana au haina muundo sahihi." },
         { status: 400 }
       );
     }
 
-    // Kutengeneza array ya wageni yenye qrToken na secretHash zinazohitajika na Prisma
-    const guestData = guests.map((g: any) => {
+    // 2. Kutengeneza data yenye qrToken na secretHash
+    const formattedGuests = guests.map((guest: any) => {
       const qrToken = crypto.randomUUID();
       const secretHash = crypto
         .createHash("sha256")
-        .update(`${id}-${g.name}-${Date.now()}-${Math.random()}`)
+        .update(`${eventId}-${qrToken}`)
         .digest("hex");
 
       return {
-        eventId: id,
-        name: g.name,
-        email: g.email || null,
-        phone: g.phone || null,
-        category: g.category || "General",
-        qrToken: g.qrToken || qrToken,
-        secretHash: g.secretHash || secretHash,
+        name: guest.name,
+        phone: guest.phone || null,
+        email: guest.email || null,
+        eventId: eventId,
+        qrToken: qrToken,
+        secretHash: secretHash,
       };
     });
 
     const createdGuests = await prisma.guest.createMany({
-      data: guestData,
+      data: formattedGuests,
     });
 
-    return NextResponse.json(
-      { message: "Guests imported successfully", count: createdGuests.count },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      message: "Wageni wameingizwa kikamilifu!",
+      count: createdGuests.count,
+    });
   } catch (error) {
+    console.error("Error importing guests:", error);
     return NextResponse.json(
-      { error: "Failed to import guests" },
+      { error: "Kuna tatizo limetokea wakati wa ku-import wageni." },
       { status: 500 }
     );
   }
