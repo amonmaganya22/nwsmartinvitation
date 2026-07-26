@@ -59,25 +59,38 @@ export function EventForm({ initial }: { initial?: EventFormValues }) {
     setError(null);
     setLoading(true);
     try {
+      // Tunatuma vigezo vyote viwili (vya frontend na backend) ili kuhakikisha havigongi mwamba
       const payload = {
+        title: values.name,
         name: values.name,
+        date: values.eventDate,
         eventDate: values.eventDate,
         eventTime: values.eventTime,
+        time: values.eventTime,
         venue: values.venue,
+        location: values.venue,
         description: values.description,
-        coverImageUrl: values.coverImageUrl,
+        coverUrl: values.coverImageUrl || null,
+        coverImageUrl: values.coverImageUrl || null,
         templateId: values.templateId || undefined
       };
+
       if (isEdit) {
         await apiFetch(`/api/events/${initial!.id}`, { method: "PUT", body: JSON.stringify(payload) });
         router.push(`/dashboard/events/${initial!.id}`);
       } else {
         const data = await apiFetch("/api/events", { method: "POST", body: JSON.stringify(payload) });
-        router.push(`/dashboard/events/${data.event.id}`);
+        
+        // Kama backend ikirudisha event na id
+        if (data?.event?.id) {
+          router.push(`/dashboard/events/${data.event.id}`);
+        } else {
+          router.push("/dashboard/events");
+        }
       }
       router.refresh();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Hitilafu imetokea wakati wa kuunda event");
     } finally {
       setLoading(false);
     }

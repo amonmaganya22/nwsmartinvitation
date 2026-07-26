@@ -46,21 +46,36 @@ export async function PUT(
     if ("error" in auth) return auth.error;
 
     const body = await req.json();
-    const { title, name, date, location, description } = body;
 
-    const eventName = name || title;
+    // Map vigezo vyote vinavyoweza kutumwa kutoka Frontend
+    const eventName = body.name || body.title;
+    const rawDate = body.eventDate || body.date;
+    const locationName = body.venue || body.location;
+    const coverUrl = body.coverImageUrl || body.coverUrl || body.cover;
+    const description = body.description;
+
+    // Tengeneza update payload kiustadi
+    const updateData: Record<string, any> = {};
+
+    if (eventName) updateData.name = eventName;
+    if (rawDate) {
+      const parsedDate = new Date(rawDate);
+      if (!isNaN(parsedDate.getTime())) {
+        updateData.date = parsedDate;
+      }
+    }
+    if (locationName !== undefined) updateData.location = locationName;
+    if (description !== undefined) updateData.description = description;
+    
+    // Inahifadhi ama URL ya picha au null (kama mtumiaji amefuta picha)
+    if (coverUrl !== undefined) updateData.coverUrl = coverUrl || null;
 
     const updatedEvent = await prisma.event.updateMany({
       where: {
         id,
         userId: auth.user.id,
       },
-      data: {
-        ...(eventName && { name: eventName }),
-        ...(date && { date: new Date(date) }),
-        ...(location && { location }),
-        ...(description && { description }),
-      },
+      data: updateData,
     });
 
     if (updatedEvent.count === 0) {
@@ -72,6 +87,7 @@ export async function PUT(
 
     return NextResponse.json({ message: "Event updated successfully" });
   } catch (error) {
+    console.error("PUT_EVENT_ERROR:", error);
     return NextResponse.json(
       { error: "Failed to update event" },
       { status: 500 }

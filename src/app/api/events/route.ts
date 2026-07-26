@@ -1,41 +1,66 @@
 import { NextResponse } from "next/server";
-// Hakikisha ume-import prisma au supabase client wako hapa kama unaitumia
-// import { prisma } from "@/lib/prisma"; 
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
-    // Tenga data zinazokuja kutoka frontend
-    const { title, description, date, location, coverUrl } = body;
 
-    // 1. Check za lazima (Title na Date pekee ndio vya lazima)
-    if (!title || !date) {
+    // Inachukua 'title' au 'name' au 'eventName'
+    const title = body.title || body.name || body.eventName;
+    
+    // Inachukua 'date' au 'eventDate'
+    const rawDate = body.date || body.eventDate;
+
+    // Inachukua 'location' au 'venue'
+    const location = body.location || body.venue || null;
+
+    // Description na Cover Image (za hiari / optional)
+    const description = body.description || null;
+    const coverUrl = body.coverUrl || body.cover || body.coverImageUrl || null;
+
+    // 1. Validation ya vifaa vya lazima
+    if (!title || !rawDate) {
       return NextResponse.json(
         { error: "Title na Date vinahitajika!" },
         { status: 400 }
       );
     }
 
-    // 2. Hapa weka code ya kuhifadhi kwenye Database yako.
-    // Notice jinsi `coverUrl` inavyoshughulikiwa kama optional (kama haipo inakuwa null)
+    // 2. Hakikisha Date ipo kwenye mfumo sahihi
+    const parsedDate = new Date(rawDate);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json(
+        { error: "Format ya tarehe sio sahihi!" },
+        { status: 400 }
+      );
+    }
+
+    // 3. Hapa utakapokuwa tayari ku-save kwenye Prisma/Database:
     /*
     const newEvent = await prisma.event.create({
       data: {
         title,
         description,
-        date: new Date(date),
+        date: parsedDate,
         location,
-        coverUrl: coverUrl || null, // <-- Hapa: Kama hakuna picha, inaweka null bila kuleta error!
+        coverUrl,
       },
     });
     */
 
-    // Mfano wa return context mpaka utakapoconnect na DB yako
+    // Tunaweka mock ID ili frontend redirects zifanye kazi bila crash
+    const createdEvent = {
+      id: "demo-event-" + Date.now(),
+      title,
+      description,
+      date: parsedDate,
+      location,
+      coverUrl
+    };
+
     return NextResponse.json(
       { 
         message: "Event imeundwa kikamilifu!", 
-        event: { title, description, date, location, coverUrl: coverUrl || null } 
+        event: createdEvent 
       },
       { status: 201 }
     );
