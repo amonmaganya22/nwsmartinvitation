@@ -24,18 +24,22 @@ const plans = [
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-white dark:bg-[#0f1112]">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Logo />
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link href="/login" className="btn-secondary hidden sm:inline-flex">Log in</Link>
-          <Link href="/register" className="btn-primary">Get started</Link>
+          <Link href="/login" className="btn-secondary hidden sm:inline-flex items-center justify-center cursor-pointer">
+            Log in
+          </Link>
+          <Link href="/register" className="btn-primary inline-flex items-center justify-center cursor-pointer">
+            Get started
+          </Link>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-6 pt-16 pb-24 text-center">
-        <div className="pointer-events-none absolute -top-32 left-1/2 h-[28rem] w-[42rem] -translate-x-1/2 rounded-full bg-brand-green/10 blur-3xl" />
+      <section className="relative z-10 overflow-hidden px-6 pt-16 pb-24 text-center">
+        <div className="pointer-events-none absolute -top-32 left-1/2 -z-10 h-[28rem] w-[42rem] -translate-x-1/2 rounded-full bg-brand-green/10 blur-3xl" />
         <p className="relative mx-auto mb-4 inline-block rounded-full border border-brand-green/30 bg-brand-green/5 px-4 py-1 text-xs font-medium text-brand-green">
           One scan. Zero doubt.
         </p>
@@ -45,11 +49,13 @@ export default function LandingPage() {
         <p className="relative mx-auto mt-5 max-w-xl text-base text-gray-500 dark:text-gray-400 sm:text-lg">
           Design your event card, add your guest list, and hand every guest a QR code that can only ever be used once. No paper. No duplicate entries. No guesswork at the door.
         </p>
-        <div className="relative mt-8 flex items-center justify-center gap-3">
-          <Link href="/register" className="btn-primary px-6 py-3">
+        <div className="relative z-20 mt-8 flex items-center justify-center gap-3">
+          <Link href="/register" className="btn-primary inline-flex items-center justify-center gap-2 px-6 py-3 cursor-pointer">
             Create your first event <ArrowRight size={16} />
           </Link>
-          <Link href="/login" className="btn-secondary px-6 py-3">I already have an account</Link>
+          <Link href="/login" className="btn-secondary inline-flex items-center justify-center px-6 py-3 cursor-pointer">
+            I already have an account
+          </Link>
         </div>
       </section>
 
@@ -104,7 +110,7 @@ export default function LandingPage() {
               <ul className="mt-5 space-y-2 text-sm text-gray-500 dark:text-gray-400">
                 {p.features.map((f) => <li key={f}>• {f}</li>)}
               </ul>
-              <Link href="/register" className={p.highlighted ? "btn-primary mt-6 w-full" : "btn-secondary mt-6 w-full"}>
+              <Link href="/register" className={`inline-flex items-center justify-center cursor-pointer mt-6 w-full ${p.highlighted ? "btn-primary" : "btn-secondary"}`}>
                 Choose {p.name}
               </Link>
             </div>

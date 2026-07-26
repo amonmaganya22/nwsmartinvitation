@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const key = clientKeyFromRequest(req, "register");
-  const limited = rateLimit(key, 5, 15 * 60 * 1000); // 5 registrations per 15 min per IP
+  const limited = rateLimit(key, 5, 15 * 60 * 1000); // Registration limit: 5 kwa min 15
   if (!limited.allowed) {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
   }
@@ -22,10 +22,15 @@ export async function POST(req: NextRequest) {
   const { fullName, email, phone, password } = parsed.data;
   const cleanName = sanitizeText(fullName);
 
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) {
-    // Same message as a generic failure — do not reveal whether the email exists.
-    return NextResponse.json({ error: "Unable to create account with these details." }, { status: 409 });
+  // 1. Angalia kama Email AU Phone Number tayari vimeshasajiliwa
+  const existingEmail = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const existingPhone = phone ? await prisma.user.findUnique({ where: { phone } }) : null;
+
+  if (existingEmail || existingPhone) {
+    return NextResponse.json(
+      { error: "Unable to create account with these details." }, 
+      { status: 409 }
+    );
   }
 
   const passwordHash = await hashPassword(password);
@@ -44,7 +49,6 @@ export async function POST(req: NextRequest) {
   const sessionUser = { id: user.id, email: user.email, fullName: user.fullName, role: user.role, plan: user.plan };
   const accessToken = signAccessToken(sessionUser);
   const refreshToken = signRefreshToken(user.id);
-  setAuthCookies(accessToken, refreshToken);
   const csrfToken = issueCsrfToken();
 
   await logAudit({
@@ -55,5 +59,12 @@ export async function POST(req: NextRequest) {
     ipAddress: clientKeyFromRequest(req).split(":")[0]
   });
 
-  return NextResponse.json({ user: sessionUser, csrfToken }, { status: 201 });
+  // 2. Tengeneza Response Kwanza
+  const response = NextResponse.json({ user: sessionUser, csrfToken }, { status: 201 });
+
+  // 3. Weka Cookies Kwenye Response Hiyo Hiyo
+  // (Inategemea kama setAuthCookies yako inapokea response kama parameter ya 3)
+  await setAuthCookies(accessToken, refreshToken, response);
+
+  return response;
 }

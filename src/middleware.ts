@@ -1,42 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyAccessToken } from "./lib/auth";
-import { verifyCsrf } from "./lib/csrf";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const PROTECTED_PAGE_PREFIXES = ["/dashboard", "/scanner"];
-const MUTATING_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
-// Auth endpoints issue the CSRF cookie themselves and can't be expected to already have it.
-const CSRF_EXEMPT_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password"];
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  // 1. Chukua JWT token kutoka kwenye Cookies
+  const token = request.cookies.get('nwsi_access')?.value;
 
-  // 1. Page-level auth guard
-  if (PROTECTED_PAGE_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const token = req.cookies.get("nwsi_access")?.value;
-    const session = token ? verifyAccessToken(token) : null;
-    if (!session) {
-      const loginUrl = new URL("/login", req.url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+  // 2. Orodha ya kurasa zinazohitaji ulinzi (Protected Routes)
+  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/scanner');
+
+  // 3. Orodha ya kurasa za Auth (Kama tayari amelogin, asirudishe login/register)
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
+
+  // SCENARIO A: Anajaribu kuingia Dashboard lakini HAKUNA Token
+  if (isProtectedRoute && !token) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname); // Inahifadhi alipokuwa anataka kwenda
+    return NextResponse.redirect(loginUrl);
   }
 
-  // 2. CSRF guard on mutating API calls
-  if (
-    pathname.startsWith("/api/") &&
-    MUTATING_METHODS.includes(req.method) &&
-    !CSRF_EXEMPT_PATHS.includes(pathname)
-  ) {
-    const cookieToken = req.cookies.get("nwsi_csrf")?.value;
-    const headerToken = req.headers.get("x-csrf-token") ?? undefined;
-    if (!verifyCsrf(cookieToken, headerToken)) {
-      return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 });
-    }
+  // SCENARIO B: Tayari AMELOGIN (ana token) halafu anajaribu kwenda /login au /register
+  if (isAuthRoute && token) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();
 }
 
+// Config ya kuifanya Middleware ikimbie kwenye kurasa husika pekee
 export const config = {
-  matcher: ["/dashboard/:path*", "/scanner/:path*", "/api/:path*"]
+  matcher: [
+    '/dashboard/:path*',
+    '/scanner/:path*',
+    '/login',
+    '/register',
+  ],
 };
