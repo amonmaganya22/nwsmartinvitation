@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  SCANNER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+enum GuestStatus {
+  UNUSED
+  USED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum CheckinResult {
+  SUCCESS
+  ALREADY_USED
+  INVALID
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  phone        String?  @unique
+  passwordHash String
+  role         Role     @default(OWNER)
+  plan         Plan     @default(FREE)
+  planExpiresAt DateTime?
+  guestQuotaExtra Int    @default(0) // extra guests purchased via top-ups
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  events       Event[]
+  payments     Payment[]
+  auditLogs    AuditLog[]
+  checkinsDone CheckinLog[] @relation("ScannedBy")
+
+  @@index([email])
+}
+
+model Template {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. "wedding", "vip"
+  name         String
+  category     String
+  isPremium    Boolean  @default(false)
+  layoutJson   Json
+  previewColor String   @default("#4c9a2a")
+  createdAt    DateTime @default(now())
+
+  events       Event[]
+}
+
+model Event {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  eventDate     DateTime
+  eventTime     String
+  venue         String
+  description   String?
+  coverImageUrl String?
+  templateId    String?
+  template      Template? @relation(fields: [templateId], references: [id])
+  status        String   @default("active") // active | archived
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  guests        Guest[]
+
+  @@index([userId])
+}
+
+model Guest {
+  id           String       @id @default(cuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  email        String?
+  qrToken      String       @unique // public random id encoded in the QR image
+  secretHash   String       // HMAC(qrToken + eventId) - server-verifiable, tamper-proof
+  status       GuestStatus  @default(UNUSED)
+  checkedInAt  DateTime?
+  createdAt    DateTime     @default(now())
+
+  checkinLogs  CheckinLog[]
+
+  @@index([eventId])
+  @@index([qrToken])
+}
+
+model CheckinLog {
+  id           String        @id @default(cuid())
+  guestId      String?
+  guest        Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  scannedById  String?
+  scannedBy    User?         @relation("ScannedBy", fields: [scannedById], references: [id])
+  result       CheckinResult
+  rawToken     String
+  ipAddress    String?
+  scannedAt    DateTime      @default(now())
+
+  @@index([guestId])
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planOrPack          String        // "BASIC" | "PREMIUM" | "TOPUP_50"
+  amountTzs           Int
+  guestQuota          Int           @default(0)
+  mobileMoneyNumber   String
+  transactionReference String
+  status              PaymentStatus @default(PENDING)
+  confirmedById       String?
+  createdAt           DateTime      @default(now())
+  confirmedAt         DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
