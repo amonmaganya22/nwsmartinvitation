@@ -3,7 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, requireRole } from "@/lib/require-auth";
 import { logAudit } from "@/lib/audit";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
   const forbidden = requireRole(auth.user, ["ADMIN"]);
@@ -15,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   }
 
-  const payment = await prisma.payment.findUnique({ where: { id: params.id } });
+  const payment = await prisma.payment.findUnique({ where: { id } });
   if (!payment) return NextResponse.json({ error: "Payment not found." }, { status: 404 });
   if (payment.status !== "PENDING") {
     return NextResponse.json({ error: "This payment has already been processed." }, { status: 409 });
