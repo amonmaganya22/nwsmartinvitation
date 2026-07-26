@@ -4,20 +4,20 @@ import { requireUser } from "@/lib/require-auth";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Hakikisha mtumiaji ameingia kwenye mfumo (Authenticated)
+    // 1. Authenticate user
     const auth = await requireUser();
     if ("error" in auth) return auth.error;
 
     const body = await req.json();
 
-    // Map vigezo vyote vinavyoweza kutumwa kutoka Frontend
-    const titleName = body.title || body.name || body.eventName;
-    const rawDate = body.date || body.eventDate;
-    const location = body.location || body.venue || null;
+    // Map vigezo vyote
+    const titleName = body.name || body.title || body.eventName;
+    const rawDate = body.eventDate || body.date;
+    const locationName = body.venue || body.location || null;
     const description = body.description || null;
-    const coverUrl = body.coverUrl || body.cover || body.coverImageUrl || null;
+    const coverUrl = body.coverImageUrl || body.coverUrl || body.cover || null;
 
-    // 2. Validation ya vifaa vya lazima
+    // 2. Validation
     if (!titleName || !rawDate) {
       return NextResponse.json(
         { error: "Title na Date vinahitajika!" },
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Hakikisha Date ipo kwenye mfumo sahihi
     const parsedDate = new Date(rawDate);
     if (isNaN(parsedDate.getTime())) {
       return NextResponse.json(
@@ -34,16 +33,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Hifadhi Event halisi kwenye Database kupitia Prisma
-    // Ukaguzi wa field ya name/title kwenye Prisma Schema yako
+    // 3. Save to Prisma using schema's exact property names ('venue', 'eventDate', 'coverImageUrl')
     const newEvent = await prisma.event.create({
       data: {
-        name: titleName, // Kama schema yako inatumia 'title', badilisha hapa kuwa `title: titleName`
+        name: titleName,
+        eventDate: parsedDate,
+        venue: locationName, // <--- 'venue' badala ya 'location'
         description,
-        date: parsedDate,
-        location,
-        coverUrl,
-        userId: auth.user.id, // Inaunganisha event na mtumiaji aliyetengeneza
+        coverImageUrl: coverUrl, // <--- 'coverImageUrl' badala ya 'coverUrl'
+        userId: auth.user.id,
       },
     });
 
