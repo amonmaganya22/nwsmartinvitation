@@ -1,49 +1,110 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { packQrPayload, renderQrDataUrl } from "@/lib/qr";
-import { EventCard, CardLayout } from "@/templates/EventCard";
-import { CardDownloadActions } from "@/components/CardDownloadActions";
-import { Logo } from "@/components/Logo";
+'use client';
 
-const fallbackLayout: CardLayout = { bg: "#ffffff", accent: "#4c9a2a", font: "sans", border: "none", icon: "dot" };
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 
-export default async function InviteCardPage({ params }: { params: { token: string } }) {
-  const guest = await prisma.guest.findUnique({
-    where: { qrToken: params.token },
-    include: { event: { include: { template: true } } }
-  });
+export default function InvitePage() {
+  const params = useParams();
+  const token = params.token;
 
-  if (!guest) return notFound();
+  const [guest, setGuest] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const packed = packQrPayload(guest.qrToken, guest.eventId, guest.secretHash);
-  const qrDataUrl = await renderQrDataUrl(packed);
-  const layout = (guest.event.template?.layoutJson as unknown as CardLayout) || fallbackLayout;
+  // 1. Fetch taarifa za mgeni kupitia token
+  useEffect(() => {
+    if (!token) return;
+
+    fetch(`/api/guest/${token}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setGuest(data.guest);
+        } else {
+          setMessage(data.message || 'Mgeni hakutambulika.');
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setMessage('Imeshindikana kupata taarifa za mgeni.');
+        setLoading(false);
+      });
+  }, [token]);
+
+  // 2. Kazi ya kubonyeza Mark as Checked-In
+  const handleCheckIn = async () => {
+    setCheckingIn(true);
+    try {
+      const res = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: token }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setGuest(data.guest);
+        setMessage('✅ Amethibitishwa kufika kikamilifu!');
+      } else {
+        setMessage(data.message || 'Imeshindikana kufanya check-in.');
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Hitilafu imetokea kwenye mtandao.');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center text-white bg-slate-900">Inapakia taarifa za kadi...</div>;
+  }
+
+  if (!guest) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center p-6 bg-slate-900 text-white text-center">
+        <h1 className="text-2xl font-bold text-red-500 mb-2">Kadi Siyo Sahihi</h1>
+        <p className="text-gray-400">{message || 'Samahani, kadi hii haipo kwenye mfumo.'}</p>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-12 dark:bg-[#0f1112]">
-      <div className="mx-auto mb-8 flex justify-center"><Logo /></div>
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white">
+      <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl text-center">
+        <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold">Uhakiki wa Lango (Gate Verification)</span>
+        
+        <h1 className="text-2xl font-bold mt-2">{guest.name}</h1>
+        <p className="text-gray-400 text-sm mt-1">{guest.title || 'Mgeni Rasmi'}</p>
 
-      <EventCard
-        layout={layout}
-        eventName={guest.event.name}
-        eventDate={guest.event.eventDate}
-        eventTime={guest.event.eventTime}
-        venue={guest.event.venue}
-        description={guest.event.description}
-        guestName={guest.name}
-        qrDataUrl={qrDataUrl}
-        coverImageUrl={guest.event.coverImageUrl}
-      />
+        {/* Hali ya sasa ya mgeni */}
+        <div className="my-6 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-gray-400">Hali ya Kadi:</p>
+          <p className={`text-lg font-bold mt-1 ${guest.status === 'CHECKED_IN' ? 'text-green-400' : 'text-amber-400'}`}>
+            {guest.status === 'CHECKED_IN' ? '✅ IMESHA-TUMIKA (CHECKED IN)' : '⏳ BADO HAJASHAFIKA (PENDING)'}
+          </p>
+        </div>
 
-      <div className="mt-6">
-        <CardDownloadActions fileName={`${guest.event.name}-${guest.name}`.replace(/[^a-z0-9]+/gi, "-")} />
+        {/* Ujumbe wa mafanikio au hitilafu */}
+        {message && <p className="mb-4 text-sm text-amber-300 font-medium">{message}</p>}
+
+        {/* Kitufe cha Kum-mark */}
+        {guest.status !== 'CHECKED_IN' ? (
+          <button
+            onClick={handleCheckIn}
+            disabled={checkingIn}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl transition shadow-lg disabled:opacity-50"
+          >
+            {checkingIn ? 'Inachakata...' : 'Thibitisha Kufika (Mark as Checked In)'}
+          </button>
+        ) : (
+          <div className="bg-green-500/20 text-green-300 py-3 px-4 rounded-xl font-medium border border-green-500/30">
+            Mgeni huyu ameshapita langoni tayari.
+          </div>
+        )}
       </div>
-
-      {guest.status === "USED" && (
-        <p className="mx-auto mt-6 max-w-md text-center text-sm text-amber-600">
-          This QR code has already been checked in at the venue.
-        </p>
-      )}
-    </main>
+    </div>
   );
 }

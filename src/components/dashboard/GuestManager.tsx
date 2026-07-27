@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, Upload, Users, Phone, Mail, Trash2, QrCode, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { GuestTicketCard } from "./GuestTicketCard";
+import GuestTicketCard from "./GuestTicketCard";
 
 interface Guest {
   id: string;
@@ -298,13 +298,13 @@ export function GuestManager({
 
             {/* TEMPLATE CARD COMPONENT WITH ACTIONS */}
             <GuestTicketCard
-              guestName={selectedGuest.name}
-              guestPhone={selectedGuest.phone}
-              qrToken={selectedGuest.qrToken || ""}
-              eventName={eventName}
-              eventDate={eventDate}
-              eventLocation={eventLocation}
-              templateBgUrl={templateBgUrl}
+              guest={selectedGuest}
+              event={{
+                name: eventName,
+                date: eventDate,
+                location: eventLocation,
+                templateBgUrl: templateBgUrl,
+              }}
             />
           </div>
         </div>

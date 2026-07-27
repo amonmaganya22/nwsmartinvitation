@@ -1,71 +1,51 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { qrToken } = await req.json();
+    const body = await request.json();
+    const { token } = body;
 
-    if (!qrToken) {
+    if (!token) {
       return NextResponse.json(
-        { success: false, error: "QR Token haikupatikana!" },
+        { success: false, message: 'Token ya mgeni haipatikani.' },
         { status: 400 }
       );
     }
 
-    // 1. Tafuta Mgeni mwenye Token hii
     const guest = await prisma.guest.findUnique({
-      where: { qrToken },
-      include: { event: true },
+      where: { qrToken: token },
     });
 
     if (!guest) {
       return NextResponse.json(
-        { success: false, error: "Kadi hii sio halali au haijasajiliwa!" },
+        { success: false, message: 'Mgeni hakutambulika kwenye mfumo.' },
         { status: 404 }
       );
     }
 
-    // Convert status to string ili TypeScript isiweke mipaka
-    const currentStatus = String(guest.status).toUpperCase();
-
-    // 2. Angalia kama tayari ameshascaniwa
-    if (
-      currentStatus === "CHECKED_IN" ||
-      currentStatus === "CHECKEDIN" ||
-      currentStatus === "USED"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          alreadyCheckedIn: true,
-          error: "⚠️ KADI HII TAYARI IMESHATUMIKA!",
-          guest: {
-            name: guest.name,
-            status: guest.status,
-            checkedInAt: new Date(), // Tumetumia new Date() badala ya guest.updatedAt
-          },
-        },
-        { status: 400 }
-      );
+    if ((guest.status as string) === 'CHECKED_IN') {
+      return NextResponse.json({
+        success: false,
+        message: `Kadi ya ${guest.name} imeshawahi kutumika!`,
+      });
     }
 
-    // 3. Badilisha status
+    // Sasisha hali ya mgeni kuwa ameingia (Checked In)
     const updatedGuest = await prisma.guest.update({
       where: { id: guest.id },
-      data: {
-        status: "CHECKEDIN" as any,
-      },
+      data: { status: 'CHECKED_IN' as any },
     });
 
     return NextResponse.json({
       success: true,
-      message: "✅ KADI IMETHIBITISHWA! MGENI RUHUSA KUINGIA.",
+      message: `Karibu sana, ${guest.name}! Kadi imethibitishwa.`,
       guest: updatedGuest,
     });
   } catch (error) {
-    console.error("Checkin Error:", error);
+    console.error('Error during check-in:', error);
     return NextResponse.json(
-      { success: false, error: "Kuna tatizo kwenye mfumo!" },
+      { success: false, message: 'Hitilafu ya seva wakati wa kuhakiki.' },
       { status: 500 }
     );
   }
