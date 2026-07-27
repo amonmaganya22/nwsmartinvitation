@@ -335,7 +335,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
         </div>
       </div>
 
-      {/* Modal ya Kadi ya Mgeni (QR Code imeunganishwa na URL ya Check-in API) */}
+      {/* Modal ya Kadi ya Mgeni (QR Code imerekebishwa kutumia mfumo mpya wa /api/guest/id/[id]) */}
       {selectedGuestForCard && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-sm w-full p-6 relative space-y-4">
@@ -367,7 +367,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                 <div className="bg-white p-2.5 rounded-2xl inline-block shadow-inner">
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      `${window.location.origin}/api/events/${eventId}/check-in?guestId=${selectedGuestForCard.id}&token=${selectedGuestForCard.qrToken || ''}`
+                      typeof window !== "undefined" ? `${window.location.origin}/api/guest/id/${selectedGuestForCard.id}` : ``
                     )}`} 
                     alt="QR Code" 
                     className="w-24 h-24 mx-auto object-contain"
