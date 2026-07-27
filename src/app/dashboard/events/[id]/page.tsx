@@ -5,7 +5,7 @@ import { Pencil, Calendar, MapPin, Clock } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DeleteEventButton } from "@/components/dashboard/DeleteEventButton";
-import { GuestManager } from "@/components/dashboard/GuestManager";
+import  GuestManager  from "@/components/dashboard/GuestManager";
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
   const user = (await getSession())!;
