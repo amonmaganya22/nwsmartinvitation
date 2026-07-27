@@ -24,15 +24,16 @@ interface GuestManagerProps {
 }
 
 export default function GuestManager({ initialGuests, eventId, event }: GuestManagerProps) {
-  const [guests, setGuests] = useState<Guest[]>(initialGuests);
+  // Hakikisha initialGuests inachujwa isije ikawa na thamani za undefined
+  const [guests, setGuests] = useState<Guest[]>(initialGuests || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGuestForCard, setSelectedGuestForCard] = useState<Guest | null>(null);
 
-  // Chaguo la Template ya pamoja kwa ajili ya wageni wote wa tukio hili
+  // Chaguo za kadi na fomu
   const [template, setTemplate] = useState<"royal" | "neon" | "minimal">("neon");
   const [customTitle, setCustomTitle] = useState("VIP INVITATION PASS");
+  const [cardHeading, setCardHeading] = useState(event?.name || "Jina la Tukio");
 
-  // Fomu ya kuongeza mgeni mpya
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -59,7 +60,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
       if (res.ok) {
         const createdGuest = await res.json();
         setGuests([createdGuest, ...guests]);
-        setSelectedGuestForCard(createdGuest); // Mfungulie kadi yake moja kwa moja akiongezwa
+        setSelectedGuestForCard(createdGuest);
         setNewName("");
         setNewPhone("");
         setNewEmail("");
@@ -90,7 +91,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
     try {
       const dataUrl = await toPng(cardRef.current, { cacheBust: true, quality: 0.95 });
       const link = document.createElement("a");
-      link.download = `kadi-${selectedGuestForCard?.name.replace(/\s+/g, "-") || "mgeni"}.png`;
+      link.download = `kadi-${selectedGuestForCard?.name ? selectedGuestForCard.name.replace(/\s+/g, "-") : "mgeni"}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -110,13 +111,14 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
     }
   };
 
-  const filteredGuests = guests.filter((g) =>
-    g.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Kinga dhidi ya undefined au null wakati wa kutafuta (Search filter safety)
+  const filteredGuests = guests.filter((g) => {
+    if (!g || !g.name) return false;
+    return g.name.toLowerCase().includes((searchTerm || "").toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
-      {/* Sehemu ya Kuongeza Mgeni & Kubinafsisha Muonekano wa Kadi ya Tukio */}
       <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -149,7 +151,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-400 block mb-1">Kichwa cha Kadi (Title ya Pamoja)</label>
+              <label className="text-[10px] text-gray-400 block mb-1">Kichwa cha Juu cha Kadi (Badilisha badala ya Hafla Maalum)</label>
               <input 
                 type="text" 
                 value={customTitle}
@@ -159,7 +161,17 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-400 block mb-1">Chagua Mtindo wa Kadi ya Tukiohili (Template)</label>
+              <label className="text-[10px] text-gray-400 block mb-1">Jina la Tukio Kwenye Kadi</label>
+              <input 
+                type="text" 
+                value={cardHeading}
+                onChange={(e) => setCardHeading(e.target.value)}
+                className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-gray-400 block mb-1">Chagua Mtindo wa Kadi (Template)</label>
               <div className="grid grid-cols-3 gap-2">
                 {(["royal", "neon", "minimal"] as const).map((t) => (
                   <button
@@ -190,7 +202,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
 
         {/* Hakiki ya Kadi (Live Preview) */}
         <div className="bg-black/40 border border-gray-800/80 p-4 rounded-2xl flex flex-col items-center justify-center space-y-3">
-          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Muonekano wa Kadi kwa Wageni Wote</span>
+          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Muonekano wa Kadi (Live Preview)</span>
           
           <div className={`w-full max-w-[260px] p-5 rounded-3xl border shadow-xl space-y-3 text-center relative ${getTemplateStyles(template)}`}>
             <div className="inline-block px-3 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-white/10 border border-white/20">
@@ -198,7 +210,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
             </div>
 
             <div className="space-y-0.5">
-              <h4 className="text-sm font-extrabold tracking-wide">{event?.name || "Hafla Maalum"}</h4>
+              <h4 className="text-sm font-extrabold tracking-wide">{cardHeading}</h4>
               <p className="text-[10px] opacity-80">{event?.date || "Tarehe"} | {event?.location || "Eneo"}</p>
             </div>
 
@@ -210,7 +222,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
 
             <div className="bg-white p-2 rounded-xl inline-block shadow-inner">
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=PREVIEW" 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=PREVIEW_QR" 
                 alt="QR Code" 
                 className="w-20 h-20 mx-auto object-contain"
               />
@@ -276,7 +288,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
         </div>
       </div>
 
-      {/* Modal ya Kuona na Kudownload Kadi ya Mgeni Aliyetengenezwa */}
+      {/* Modal ya Kadi ya Mgeni (QR Code imeunganishwa na taarifa zake halisi) */}
       {selectedGuestForCard && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-sm w-full p-6 relative space-y-4">
@@ -297,7 +309,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                   {customTitle}
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-extrabold tracking-wide">{event?.name || "Hafla Maalum"}</h3>
+                  <h3 className="text-base font-extrabold tracking-wide">{cardHeading}</h3>
                   <p className="text-[11px] opacity-80">{event?.date || "Tarehe"} | {event?.location || "Eneo"}</p>
                 </div>
                 <div className="bg-black/30 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl space-y-1">
@@ -307,7 +319,15 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                 </div>
                 <div className="bg-white p-2.5 rounded-2xl inline-block shadow-inner">
                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(selectedGuestForCard.qrToken || selectedGuestForCard.id)}`} 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                      JSON.stringify({
+                        id: selectedGuestForCard.id,
+                        name: selectedGuestForCard.name,
+                        phone: selectedGuestForCard.phone,
+                        token: selectedGuestForCard.qrToken,
+                        event: cardHeading
+                      })
+                    )}`} 
                     alt="QR Code" 
                     className="w-24 h-24 mx-auto object-contain"
                   />
