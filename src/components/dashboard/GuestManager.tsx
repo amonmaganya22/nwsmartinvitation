@@ -112,10 +112,9 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
       });
 
       const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = 90; // Ukubwa wa kadi ndani ya PDF (mm)
+      const pdfWidth = 90; 
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      // Kuweka kadi katikati ya ukurasa wa PDF
       const x = (210 - pdfWidth) / 2;
       const y = 30;
 
@@ -336,7 +335,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
         </div>
       </div>
 
-      {/* Modal ya Kadi ya Mgeni (Vitufe vya PNG na PDF) */}
+      {/* Modal ya Kadi ya Mgeni (QR Code imeunganishwa na URL ya Check-in API) */}
       {selectedGuestForCard && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-sm w-full p-6 relative space-y-4">
@@ -368,12 +367,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                 <div className="bg-white p-2.5 rounded-2xl inline-block shadow-inner">
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      JSON.stringify({
-                        type: "VERIFY_CHECKIN",
-                        guestId: selectedGuestForCard.id,
-                        token: selectedGuestForCard.qrToken,
-                        eventId: eventId
-                      })
+                      `${window.location.origin}/api/events/${eventId}/check-in?guestId=${selectedGuestForCard.id}&token=${selectedGuestForCard.qrToken || ''}`
                     )}`} 
                     alt="QR Code" 
                     className="w-24 h-24 mx-auto object-contain"

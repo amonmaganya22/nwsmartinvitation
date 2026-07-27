@@ -5,7 +5,7 @@ import { Pencil, Calendar, MapPin, Clock } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DeleteEventButton } from "@/components/dashboard/DeleteEventButton";
-import  GuestManager  from "@/components/dashboard/GuestManager";
+import GuestManager from "@/components/dashboard/GuestManager";
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
   const user = (await getSession())!;
@@ -73,6 +73,12 @@ export default async function EventDetailPage({ params }: { params: { id: string
       <div className="pt-2">
         <GuestManager
           eventId={event.id}
+          event={{
+            name: event.name,
+            date: format(new Date(event.eventDate), "yyyy-MM-dd"),
+            time: event.eventTime,
+            location: event.venue
+          }}
           initialGuests={event.guests.map((g) => ({
             id: g.id,
             name: g.name,
