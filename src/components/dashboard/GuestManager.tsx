@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Trash2, FileText, CheckCircle2, XCircle, Search, UserPlus, Download } from "lucide-react";
 import { toPng } from "html-to-image";
+import jsPDF from "jspdf";
 
 interface Guest {
   id: string;
@@ -20,19 +21,20 @@ interface GuestManagerProps {
     name?: string;
     date?: string;
     location?: string;
+    time?: string;
   };
 }
 
 export default function GuestManager({ initialGuests, eventId, event }: GuestManagerProps) {
-  // Hakikisha initialGuests inachujwa isije ikawa na thamani za undefined
   const [guests, setGuests] = useState<Guest[]>(initialGuests || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGuestForCard, setSelectedGuestForCard] = useState<Guest | null>(null);
 
-  // Chaguo za kadi na fomu
   const [template, setTemplate] = useState<"royal" | "neon" | "minimal">("neon");
   const [customTitle, setCustomTitle] = useState("VIP INVITATION PASS");
   const [cardHeading, setCardHeading] = useState(event?.name || "Jina la Tukio");
+  const [cardTime, setCardTime] = useState(event?.time || "14:00");
+  const [cardLocation, setCardLocation] = useState(event?.location || "Eneo linatajwa");
 
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
@@ -99,6 +101,31 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!cardRef.current) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, { cacheBust: true, quality: 0.95 });
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = 90; // Ukubwa wa kadi ndani ya PDF (mm)
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      // Kuweka kadi katikati ya ukurasa wa PDF
+      const x = (210 - pdfWidth) / 2;
+      const y = 30;
+
+      pdf.addImage(dataUrl, "PNG", x, y, pdfWidth, pdfHeight);
+      pdf.save(`kadi-${selectedGuestForCard?.name ? selectedGuestForCard.name.replace(/\s+/g, "-") : "mgeni"}.pdf`);
+    } catch (err) {
+      console.error("Hitilafu ya kudownload PDF:", err);
+    }
+  };
+
   const getTemplateStyles = (tmpl: string) => {
     switch (tmpl) {
       case "royal":
@@ -111,7 +138,6 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
     }
   };
 
-  // Kinga dhidi ya undefined au null wakati wa kutafuta (Search filter safety)
   const filteredGuests = guests.filter((g) => {
     if (!g || !g.name) return false;
     return g.name.toLowerCase().includes((searchTerm || "").toLowerCase());
@@ -123,7 +149,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-sm font-bold text-white">Ongeza Mgeni Mpya</h3>
+            <h3 className="text-sm font-bold text-white">Ongeza Mgeni Mpya & Hariri Kadi</h3>
           </div>
 
           <form onSubmit={handleAddGuest} className="space-y-3">
@@ -150,24 +176,46 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
               />
             </div>
 
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-1">Kichwa cha Juu cha Kadi (Badilisha badala ya Hafla Maalum)</label>
-              <input 
-                type="text" 
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">Kichwa cha Juu (Title)</label>
+                <input 
+                  type="text" 
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">Jina la Tukio</label>
+                <input 
+                  type="text" 
+                  value={cardHeading}
+                  onChange={(e) => setCardHeading(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-1">Jina la Tukio Kwenye Kadi</label>
-              <input 
-                type="text" 
-                value={cardHeading}
-                onChange={(e) => setCardHeading(e.target.value)}
-                className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">Saa / Muda</label>
+                <input 
+                  type="text" 
+                  value={cardTime}
+                  onChange={(e) => setCardTime(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">Mahali / Eneo</label>
+                <input 
+                  type="text" 
+                  value={cardLocation}
+                  onChange={(e) => setCardLocation(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -211,7 +259,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
 
             <div className="space-y-0.5">
               <h4 className="text-sm font-extrabold tracking-wide">{cardHeading}</h4>
-              <p className="text-[10px] opacity-80">{event?.date || "Tarehe"} | {event?.location || "Eneo"}</p>
+              <p className="text-[10px] opacity-80">{cardTime} | {cardLocation}</p>
             </div>
 
             <div className="bg-black/30 backdrop-blur-md border border-white/10 p-2.5 rounded-2xl space-y-0.5">
@@ -222,7 +270,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
 
             <div className="bg-white p-2 rounded-xl inline-block shadow-inner">
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=PREVIEW_QR" 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=VERIFY_CHECKIN_PREVIEW" 
                 alt="QR Code" 
                 className="w-20 h-20 mx-auto object-contain"
               />
@@ -262,7 +310,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                       guest.status === "CHECKED_IN" ? "bg-emerald-950 text-emerald-400 border border-emerald-800/50" : "bg-gray-800 text-gray-400"
                     }`}>
                       {guest.status === "CHECKED_IN" ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                      {guest.status}
+                      {guest.status === "CHECKED_IN" ? "VERIFIED" : guest.status}
                     </span>
 
                     <button
@@ -288,7 +336,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
         </div>
       </div>
 
-      {/* Modal ya Kadi ya Mgeni (QR Code imeunganishwa na taarifa zake halisi) */}
+      {/* Modal ya Kadi ya Mgeni (Vitufe vya PNG na PDF) */}
       {selectedGuestForCard && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-sm w-full p-6 relative space-y-4">
@@ -310,7 +358,7 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-base font-extrabold tracking-wide">{cardHeading}</h3>
-                  <p className="text-[11px] opacity-80">{event?.date || "Tarehe"} | {event?.location || "Eneo"}</p>
+                  <p className="text-[11px] opacity-80">{cardTime} | {cardLocation}</p>
                 </div>
                 <div className="bg-black/30 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl space-y-1">
                   <p className="text-[10px] uppercase tracking-wider opacity-70">Mgeni Mwalikwa</p>
@@ -321,11 +369,10 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
                       JSON.stringify({
-                        id: selectedGuestForCard.id,
-                        name: selectedGuestForCard.name,
-                        phone: selectedGuestForCard.phone,
+                        type: "VERIFY_CHECKIN",
+                        guestId: selectedGuestForCard.id,
                         token: selectedGuestForCard.qrToken,
-                        event: cardHeading
+                        eventId: eventId
                       })
                     )}`} 
                     alt="QR Code" 
@@ -336,12 +383,20 @@ export default function GuestManager({ initialGuests, eventId, event }: GuestMan
               </div>
             </div>
 
-            <button
-              onClick={handleDownloadCard}
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-2xl text-xs transition shadow-lg shadow-indigo-600/30"
-            >
-              <Download className="w-4 h-4" /> Download Kadi (PNG)
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleDownloadCard}
+                className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-3 rounded-2xl text-xs transition shadow-lg shadow-indigo-600/30"
+              >
+                <Download className="w-3.5 h-3.5" /> Download PNG
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30"
+              >
+                <Download className="w-3.5 h-3.5" /> Download PDF
+              </button>
+            </div>
           </div>
         </div>
       )}
