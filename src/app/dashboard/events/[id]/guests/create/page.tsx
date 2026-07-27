@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 
-export default function CreateGuestPage() {
+export default function GuestCardGenerator() {
   const params = useParams();
   const eventId = params.id as string;
 
@@ -15,14 +15,13 @@ export default function CreateGuestPage() {
   const [loading, setLoading] = useState(false);
   const [origin, setOrigin] = useState("");
 
-  // Hii inazuia makosa ya window kwenye Vercel
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -48,75 +47,51 @@ export default function CreateGuestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
-      <div className="max-w-md w-full bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-xl font-bold mb-4 text-gray-800">Ongeza Mgeni & Genereti QR</h1>
+    <div className="p-6 max-w-md mx-auto bg-white rounded-xl shadow-md space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">Unda Kadi na QR Code</h2>
+      
+      <form onSubmit={handleGenerate} className="space-y-3">
+        <input
+          type="text"
+          placeholder="Jina la Mgeni (Mf. Ben Juma)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="w-full p-2 border rounded text-black"
+        />
+        <input
+          type="text"
+          placeholder="Namba ya Simu"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="w-full p-2 border rounded text-black"
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white p-2 rounded font-bold hover:bg-blue-700"
+        >
+          {loading ? "Inatengeneza..." : "Genereti Kadi"}
+        </button>
+      </form>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Jina Kamili</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full border p-2 rounded mt-1 text-black"
-              placeholder="Mf. Juma Ally"
+      {/* Hapa ndipo QR Code inajenga URL sahihi ya kwenda kwenye /verify */}
+      {createdGuest && origin && (
+        <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center bg-gray-50">
+          <p className="font-bold text-gray-800">Kadi ya: {createdGuest.name}</p>
+          <div className="my-4 flex justify-center bg-white p-3 rounded shadow inline-block">
+            <QRCodeSVG
+              value={`${origin}/verify?token=${createdGuest.qrToken}&eventId=${eventId}`}
+              size={180}
+              level="H"
+              includeMargin={true}
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Namba ya Simu</label>
-            <input
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full border p-2 rounded mt-1 text-black"
-              placeholder="Mf. 0712345678"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Barua Pepe (Email)</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border p-2 rounded mt-1 text-black"
-              placeholder="Mf. juma@email.com"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white p-2 rounded font-bold hover:bg-blue-700 transition"
-          >
-            {loading ? "Inatengeneza..." : "Genereti QR Code"}
-          </button>
-        </form>
-
-        {/* Sehemu ya Kuonyesha QR Code Baada ya Kutengenezwa */}
-        {createdGuest && origin && (
-          <div className="mt-6 p-4 border border-green-200 bg-green-50 rounded-lg text-center">
-            <h3 className="font-bold text-green-700 mb-2">Mgeni Ameongezwa Kikamilifu!</h3>
-            <p className="text-sm text-gray-700 mb-4">Jina: <b>{createdGuest.name}</b></p>
-
-            <div className="flex justify-center bg-white p-4 rounded shadow-inner inline-block">
-              <QRCodeSVG
-                value={`${origin}/verify?token=${createdGuest.qrToken}&eventId=${eventId}`}
-                size={180}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-
-            <p className="text-xs text-gray-500 mt-3">
-              Scan QR hii kwa simu yako, itafunguka moja kwa moja na kitufe cha Mark In.
-            </p>
-          </div>
-        )}
-      </div>
+          <p className="text-xs text-gray-500">
+            Skana hii itafungua ukurasa wa uhakiki moja kwa moja bila blank page.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

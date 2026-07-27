@@ -48,7 +48,7 @@ function VerifyContent() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 text-center">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Uhakiki wa Mgeni</h1>
-        <p className="text-sm text-gray-500 mb-6">Skrini ya Kuingia (Check-in)</p>
+        <p className="text-sm text-gray-500 mb-6">Mfumo wa Udhibiti wa Wageni</p>
 
         {successMsg ? (
           <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg mb-4">
@@ -71,7 +71,7 @@ function VerifyContent() {
             )}
 
             <div className="bg-gray-50 p-4 rounded-lg mb-6 text-left border">
-              <p className="text-xs text-gray-400 uppercase font-semibold">Token:</p>
+              <p className="text-xs text-gray-400 uppercase font-semibold">Token ya Mgeni:</p>
               <p className="text-xs font-mono text-gray-700 break-all">{token || "Hakuna Token"}</p>
             </div>
 
