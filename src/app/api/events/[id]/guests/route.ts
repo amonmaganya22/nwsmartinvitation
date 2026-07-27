@@ -26,8 +26,7 @@ export async function POST(
         phone,
         email,
         eventId: id,
-        // Tumia thamani sahihi iliyopo kwenye enum yako (kama vile GuestStatus.UNUSED badala ya PENDING)
-        status: GuestStatus.UNUSED, 
+        status: GuestStatus.UNUSED,
         qrToken,
         secretHash,
       },

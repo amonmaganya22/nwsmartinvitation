@@ -18,7 +18,6 @@ export async function POST(
       );
     }
 
-    // Tafuta mgeni aidha kwa kutumia qrToken (wakati wa kuscan) au kwa guestId
     const guest = await db.guest.findFirst({
       where: {
         eventId: id,
@@ -36,7 +35,6 @@ export async function POST(
       );
     }
 
-    // Angalia kama mgeni tayari ametumia QR code yake (AMESHAINGIA)
     if (guest.status === GuestStatus.USED) {
       return NextResponse.json(
         { error: "QR code hii imeshawahi kutumika tayari (Imekwisha fanyiwa Check-in)" },
@@ -44,7 +42,6 @@ export async function POST(
       );
     }
 
-    // Sasisha hali ya mgeni kuwa ametumia / amefika (USED)
     const updatedGuest = await db.guest.update({
       where: { id: guest.id },
       data: {
