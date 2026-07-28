@@ -1,98 +1,98 @@
-"use client";
+'use client';
 
-import { useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
 
 function VerifyContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
-  const eventId = searchParams.get("eventId");
+    const searchParams = useSearchParams();
+    const token = searchParams.get('token');
+    const eventId = searchParams.get('eventId');
 
-  const [guest, setGuest] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+    const [guest, setGuest] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [checkingIn, setCheckingIn] = useState(false);
+    const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const handleMarkIn = async () => {
-    if (!eventId || !token) {
-      setErrorMsg("Taarifa za QR Code hazijakamilika.");
-      return;
-    }
+    // Unaweza kuongeza mantiki ya kuleta taarifa za mgeni hapa kwanza kama unataka kuonesha jina lake kabla ya kubonyeza Mark In
+    
+    const handleMarkIn = async () => {
+        if (!token || !eventId) {
+            setMessage({ text: "Taarifa za QR code hazijakamilika.", type: 'error' });
+            return;
+        }
 
-    setLoading(true);
-    setErrorMsg("");
+        setCheckingIn(true);
+        setMessage(null);
 
-    try {
-      const res = await fetch(`/api/events/${eventId}/check-in`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrToken: token }),
-      });
+        try {
+            const res = await fetch(`/api/events/${eventId}/check-in`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qrToken: token }),
+            });
 
-      const data = await res.json();
-      if (res.ok) {
-        setGuest(data.guest);
-        setSuccessMsg("Check-in imefanikiwa! Mgeni ameingia.");
-      } else {
-        setErrorMsg(data.error || "Imeshindwa kufanya check-in");
-      }
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Hitilafu imetokea kwenye mtandao.");
-    } finally {
-      setLoading(false);
-    }
-  };
+            const data = await res.json();
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 text-center">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Uhakiki wa Mgeni</h1>
-        <p className="text-sm text-gray-500 mb-6">Mfumo wa Udhibiti wa Wageni</p>
+            if (res.ok) {
+                setGuest(data.guest);
+                setMessage({ text: "Amefanikiwa! Mgeni ameingia.", type: 'success' });
+            } else {
+                // Hapa ndipo tunamkataa kama tayari ameshaingia au kuna kosa
+                if (data.error === "Already checked in") {
+                    setMessage({ text: "Huyu mtu tayari ameshaingia (Checked-in)!", type: 'error' });
+                } else {
+                    setMessage({ text: data.error || "Imeshindikana kufanya check-in.", type: 'error' });
+                }
+            }
+        } catch (err) {
+            setMessage({ text: "Kosa la mtandao limetokea.", type: 'error' });
+        } finally {
+            setCheckingIn(false);
+        }
+    };
 
-        {successMsg ? (
-          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg mb-4">
-            <p className="font-bold text-lg mb-1">✅ Imekamilika!</p>
-            <p className="text-sm mb-3">{successMsg}</p>
-            {guest && (
-              <div className="text-left bg-white p-3 rounded border border-green-100 text-black">
-                <p className="text-sm"><b>Jina:</b> {guest.name}</p>
-                <p className="text-sm"><b>Simu:</b> {guest.phone || "N/A"}</p>
-                <p className="text-sm mt-2"><b>Hali:</b> <span className="text-green-600 font-bold">USED (Ameshatinga)</span></p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg mb-4 text-sm font-semibold">
-                {errorMsg}
-              </div>
-            )}
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+            <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md text-center">
+                <h1 className="text-2xl font-bold mb-4">Uhakiki wa Wageni</h1>
+                
+                {token && eventId ? (
+                    <div className="mb-6 text-sm text-gray-600">
+                        <p>Token: <span className="font-mono bg-gray-100 p-1 rounded">{token.substring(0, 10)}...</span></p>
+                    </div>
+                ) : (
+                    <p className="text-red-500 mb-4">QR code hii haina taarifa sahihi.</p>
+                )}
 
-            <div className="bg-gray-50 p-4 rounded-lg mb-6 text-left border">
-              <p className="text-xs text-gray-400 uppercase font-semibold">Token ya Mgeni:</p>
-              <p className="text-xs font-mono text-gray-700 break-all">{token || "Hakuna Token"}</p>
+                {message && (
+                    <div className={`p-3 mb-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {message.text}
+                    </div>
+                )}
+
+                {guest && (
+                    <div className="mb-4 p-4 bg-gray-50 rounded border text-left">
+                        <p><strong>Jina:</strong> {guest.name || 'Mgeni'}</p>
+                        <p><strong>Hali:</strong> {guest.status}</p>
+                    </div>
+                )}
+
+                <button
+                    onClick={handleMarkIn}
+                    disabled={checkingIn || !token}
+                    className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
+                >
+                    {checkingIn ? 'Inachakata...' : 'Mark In (Thibitisha Kuingia)'}
+                </button>
             </div>
-
-            <button
-              onClick={handleMarkIn}
-              disabled={loading || !token}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold p-3 rounded-lg transition duration-200 disabled:opacity-50 shadow"
-            >
-              {loading ? "Inachakata..." : "Mark In (Thibitisha Kuwasili)"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default function VerifyPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-black">Inapakia taarifa...</div>}>
-      <VerifyContent />
-    </Suspense>
-  );
+    return (
+        <Suspense fallback={<div className="text-center p-10">Inapakia...</div>}>
+            <VerifyContent />
+        </Suspense>
+    );
 }

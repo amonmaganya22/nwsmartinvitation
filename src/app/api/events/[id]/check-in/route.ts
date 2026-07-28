@@ -1,64 +1,43 @@
-import { NextResponse } from "next/server";
-import { prisma as db } from "@/lib/prisma";
-import { GuestStatus } from "@prisma/client";
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const body = await req.json();
-    const { qrToken, guestId } = body;
+    try {
+        const { id: eventId } = await params;
+        const body = await req.json();
+        const { qrToken } = body;
 
-    if (!qrToken && !guestId) {
-      return NextResponse.json(
-        { error: "Token ya QR au Kitambulisho cha Mgeni kinahitajika" },
-        { status: 400 }
-      );
+        if (!qrToken) {
+            return NextResponse.json({ error: "Token haipatikani." }, { status: 400 });
+        }
+
+        // Tafuta mgeni kupitia token yake
+        const guest = await prisma.guest.findUnique({
+            where: { qrToken: qrToken },
+        });
+
+        if (!guest) {
+            return NextResponse.json({ error: "Mgeni hajapatikana kwenye mfumo." }, { status: 404 });
+        }
+
+        // UHAKIKI: Angalia kama tayari ameshachekiwa (Checked-in)
+        if (guest.status === 'USED') {
+            return NextResponse.json({ error: "Already checked in" }, { status: 400 });
+        }
+
+        // Sasisha hadhi ya mgeni kuwa ameingia
+        const updatedGuest = await prisma.guest.update({
+            where: { id: guest.id },
+            data: { status: 'USED' },
+        });
+
+        return NextResponse.json({ success: true, guest: updatedGuest }, { status: 200 });
+
+    } catch (error) {
+        console.error("Check-in error:", error);
+        return NextResponse.json({ error: "Hitilafu ya seva (Internal Server Error)." }, { status: 500 });
     }
-
-    const guest = await db.guest.findFirst({
-      where: {
-        eventId: id,
-        OR: [
-          ...(qrToken ? [{ qrToken }] : []),
-          ...(guestId ? [{ id: guestId }] : []),
-        ],
-      },
-    });
-
-    if (!guest) {
-      return NextResponse.json(
-        { error: "Mgeni hajapatikana kwenye tukio hili" },
-        { status: 404 }
-      );
-    }
-
-    if (guest.status === GuestStatus.USED) {
-      return NextResponse.json(
-        { error: "QR code hii imeshawahi kutumika tayari (Imekwisha fanyiwa Check-in)" },
-        { status: 400 }
-      );
-    }
-
-    const updatedGuest = await db.guest.update({
-      where: { id: guest.id },
-      data: {
-        status: GuestStatus.USED,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Check-in imefanikiwa! Mgeni amethibitishwa.",
-      guest: updatedGuest,
-    });
-  } catch (error) {
-    console.error("Hitilafu wakati wa kufanya check-in:", error);
-    return NextResponse.json(
-      { error: "Imeshindwa kufanya verification ya mgeni" },
-      { status: 500 }
-    );
-  }
 }
